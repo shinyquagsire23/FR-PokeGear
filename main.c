@@ -68,6 +68,8 @@ void init() {
 #include "useful.h"
 #include "img_bins/pkgearbg.h"
 #include "img_bins/pkgearmenu.h"
+#include "img_bins/pkgearbuttons.h"
+#include "img_bins/pkgearnumbers.h"
 
 //081C7250
 void init2() {
@@ -75,7 +77,7 @@ void init2() {
 		if (globalVars == 0)
 			storeCallback(retToOW);
 		else {
-			initMallocSpace(globalVars); //F68264 - doesn't work???
+			initMallocSpace(globalVars);
 			
 			clearLoopTable();
 			storeCallback2(0);
@@ -88,12 +90,10 @@ void init2() {
 
 void initMallocSpace(int pointer) {
 	
-	int tempGlobalVars = pointer + 0x58;
-	int blank = 0;
-	
-	for(int i = 0x16; i == 0 ; i -= 1, tempGlobalVars -= 0x4) {
-		int *tempGlobalVars = 0;
+	for(int i = 0x17, *tempGlobalVars = ((u8 *)pointer + 0x58); i != 0 ; i -= 1, tempGlobalVars -= 0x1) {
+		*tempGlobalVars = 0;
 	}
+	
 }
 
 //081C742C
@@ -115,9 +115,9 @@ void main(int loopTableNumber) {
 	
 void loop0()
 {
-	int allocdBGSpace = mallocBGSpace(0x0,0x82C);
-	if (allocdBGSpace == 0)
-		return 0;
+	mallocBGSpace(0x0,0x500);
+	mallocBGSpace(0x1,0x1000);
+	mallocBGSpace(0x2,0x1000);
 	initStuff();
 	return 1;
 }
@@ -128,6 +128,10 @@ void loop1()
 	storeToLoopTable((void *) loadGFXLoop + 1,1);
 }
 
+const u32 mapDataUnk[4] = { // first byte half = bg number, 2nd, 3rd, and 4th = 1st, 2nd, and 4th byte halves of BGXCNT
+	0x000001F8, 0x000011C1, 0x000021D6, 0x000031E3
+};
+
 //1C7764
 void loadGFXLoop(int loopTableNumber) {
 
@@ -137,75 +141,147 @@ void loadGFXLoop(int loopTableNumber) {
 		changeIO(0,OBJ_ENABLE | OBJ_MAP_1D);
 		initSomeMoreStuff();
 		
-		const u32 mapDataUnk[2] = {
-			0x00000050, 0x10160100
-		};
-		
-		initMapData(0x0,mapDataUnk,0x1);
+		initMapData(0x0,mapDataUnk,0x4);
 		clearStuff();
-		*currentLoop = 1;
+		(*currentLoop)++;
 	}
 	else if(*currentLoop == 1) {
-		int allocdBGSpace = getAllocdBGSpace(0);
-		loadTilesIntoBGSpace(0,0x08DC7B80,0,0,0);
-		createNewBGSpace(0,(allocdBGSpace + 0x2C));
-		whatEvenIsThis(0,(allocdBGSpace + 0x2C));
-		loadTilemapIntoBGSpace(0,0x08DC7D84,0,0);
-		loadNewPalette(0x08DC7B60,0,0x20);
-		somethingWithBG(0);
-		*currentLoop = 2;
+		int blank = 0;
+		swiB(&blank,(0xC0 << 0x13),0x05006000);
+		(*currentLoop)++;
 	}
 	else if(*currentLoop == 2) {
-		if (checkForLoadedBGs() == 0) {
-			initBG0WithText();
-			*currentLoop = 3;
-		}
+		loadStandardBoxBorders();
+		(*currentLoop)++;
 	}
 	else if(*currentLoop == 3) {
+		int allocdBGSpace = getAllocdBGSpace(0);
+		loadTilesIntoBGSpace(1,pkgearmenuTiles,0,2,0);
+		createNewBGSpace(1,(allocdBGSpace));
+		loadTilemapIntoBGSpace(1,pkgearmenuMap,0,0);
+		underloadPalette(pkgearmenuPal,0,0x20);
+		reloadBG(1);
+		(*currentLoop)++;
+	}
+	else if(*currentLoop == 4) {
+	
+		int allocdBGSpace = getAllocdBGSpace(1);
+		loadTilesIntoBGSpace(3,pkgearbgTiles,0,0,0);
+		createNewBGSpace(3,(allocdBGSpace));
+		loadTilemapIntoBGSpace(3,pkgearbgMap,0,0);
+		reloadBG(3);
+		(*currentLoop)++;
+	}
+	else if(*currentLoop == 5) {
+		if (checkForLoadedBGs() == 0) {
+			initBG0WithText();
+			(*currentLoop)++;
+		}
+	}
+	else if(*currentLoop == 6) {
 		if (checkForSomethingIDunno() == 0) {
-		//	loadSprites();
+			loadSprites();
 			
-			enableBG(0);
-			storeToLoopTable((void *) dunno + 1,1);
 			unfadeScreen();
-			*currentLoop = 4;
+			enableBG(0);
+			enableBG(1);
+			enableBG(2);
+			enableBG(3);
+			(*currentLoop)++;
 		}
 	else
 		return;
 	}
 }
 
-void dunno()
-{
-	//Something for later, but empty for now
-}
-
-const u8 tutorialText[23] = {
-	0xF8, 0x00, 0xF8, 0x01, 0xBF, 0xD2, 0xC3, 0xCE, 0xFF //(A)(B)EXIT
+const u8 tutorialText[47] = { // Press L or R to change cards.\nPress B to exit.
+	0xCA, 0xE6, 0xD9, 0xE7, 0xE7, 0x00, 0xC6, 0x00, 0xE3, 0xE6, 0x00, 0xCC, 0x00, 0xE8, 0xE3, 0x00,
+	0xD7, 0xDC, 0xD5, 0xE2, 0xDB, 0xD9, 0x00, 0xD7, 0xD5, 0xE6, 0xD8, 0xE7, 0xAD, 0xFE, 0xCA, 0xE6,
+	0xD9, 0xE7, 0xE7, 0x00, 0xBC, 0x00, 0xE8, 0xE3, 0x00, 0xD9, 0xEC, 0xDD, 0xE8, 0xAD, 0xFF
 };
 
-//caught at A12
+
+const u8 textboxData[12] = { //BG number, X pos, Y pos, width, height, palette slot, tile number (2 bytes), list terminator
+	0x00, 0x07, 0x0F, 0x16, 0x04, 0x0F, 0x94, 0x01, 0xFF, 0x0, 0x0, 0x0
+};
+
 void initBG0WithText()
 {
-	int *allocdBGSpace;
-	allocdBGSpace = getAllocdBGSpace(0);
-	textboxBGInit(boxInitStuff);
-	loadBoxPalette(0,0xFC,0xF0);
-	loadText(textBuffer,tutorialText);
-	//*(allocdBGSpace + 0x10) = 0;
+	textboxBGInit(textboxData);
+	prepTextSpace(0,0);
+	loadNormalTextbox(0,1,tutorialText,0,1,0,0);
+	writeBoxToTilemap(0,3);
 }
 
 int getAllocdBGSpace(int BG)
 {
-	return ((globalVars + 0x10) + (BG << 2));
+	return *((int *)((globalVars + 0x10) + (BG << 2)));
 }
 	
 int mallocBGSpace(int BG, int size)
 {
-	int *i = (globalVars + 0x10) + (BG << 2);
-	i = malloc(size);
-	return i;
+	int *i = ((u8 *)(globalVars + 0x10 + (BG << 2)));
+	*i = malloc(size);
+	return *i;
 }
+
+const int spritePicData[4] = {
+	pkgearbuttonsTiles, 0x00000E00, pkgearnumbersTiles, 0x00010780
+};
+
+const int spritePalTable[6] = {
+	pkgearbuttonsPal, 0x00000000, pkgearnumbersPal, 0x00000001, 0x00000000, 0x00000000
+};
+
+const u32 OAMData1[2] = {
+	0x80000000, 0x00000000
+};
+
+const u32 buttonData[6] = {
+	0x00000000, OAMData1, dummyAnimTable, 0x00000000,
+	dummyAnimData, dummyAnimRoutine
+};
+
+void loadSprites()
+{
+	for(int i=0, address = &spritePicData;i<=0x2;i++)
+	loadMultipleSpriteFrames(address + (i<<0x2));
+	loadSpritePalettesFromTable(spritePalTable);
+	for(int i=0, *address = getAllocdBGSpace(2);i<=0x4;i++,address++) {
+		int x = i << 2;
+		int y = i << 4;
+		x + i;
+		x << 0x12;
+		int z = 0xA0 << 0xE;
+		x + z;
+		address + y;
+		int spriteAddr = createSprite(buttonData,0,(x >> 0x10),0x3);
+		*address = spriteAddr;
+		*((u16 *)spriteAddr + 0x12) = 0x10;
+		*((u16 *)spriteAddr + 0x13) = (i << 0x5) + 0x10;
+	}
+}
+
+void loadSpritePalettesFromTable(int *palTable)
+{
+	int palNumber;
+	int palOffset;
+	goto checkForEnd;
+start:	
+	palNumber = (palNumber << 0x4) + (0x80 << 1);
+	palOffset = *palTable;
+	underloadPalette(palOffset,palNumber,0x20);
+	palTable += 2;
+checkForEnd:
+	if (*palTable == 0)
+		return;
+	palNumber = grabPalNumber(*(palTable + 1));
+	if(palNumber != 0xFF)
+		goto start;
+}
+	
+	
+
 /*
 void sortaMain()
 {

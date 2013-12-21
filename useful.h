@@ -1,9 +1,10 @@
-#define retToOW			(u8 *) 0x08086194 + 1
-#define loopTable		(u8 *) 0x03005E00
-#define loopTableData	(u8 *) 0x03005E08
-#define boxInitStuff	0x082FF080
-//#define boxInitStuff	0x0861FA08
-#define textBuffer		0x02021FC4
+#define retToOW			0x08086194 + 1
+#define loopTable		0x03005E00
+#define loopTableData	0x03005E08
+#define objBaseAddr		0x02020630
+#define dummyAnimTable	0x082EC69C
+#define dummyAnimData	0x082EC6A8
+#define dummyAnimRoutine 0x08007429
 
 void updateEverything()
 {
@@ -217,10 +218,10 @@ void something(int *a, int *b, int *c)
 	int i = func();
 }
 
-void initMapData(u8 *r0, u32 *r1, u8 *r2)
+void initMapData(u8 *startBG, u32 *BGData, u8 *BGCount)
 {
 	int (*func)(u8,u32,u8) = (int (*)(void))0x080017E9;
-	func(r0,r1,r2);
+	func(startBG,BGData,BGCount);
 }
 
 void clearStuff()
@@ -232,28 +233,28 @@ void clearStuff()
 	func2();
 }
 
-void loadTilesIntoBGSPace(u8 *r0, u32 *gfxData, u8 *r2, u8 *r3)
-{
-	int (*func)(u8,u32,u8,u8) = (int (*)(void))0x08199A91;
-	func(r0,gfxData,r2,r3);
-}
-
 void createNewBGSpace(u8 *r0, u32 *newSpace)
 {
-	int (*func)(u8,u32) = (int (*)(void))0x08199D99;
+	int (*func)(u8,u32) = (int (*)(void))0x08002251;
 	func(r0,newSpace);
 }
 
-void loadNewPalette(int address, int offset, int size)
+void underloadPalette(int address, int offset, int size)
 {
 	offset = ((offset << 1) + 0x02037714);
 	size = size << 0xA;
 	size = size >> 0xB;
-	int (*func)(u32,u8,u8) = (int (*)(void))0x082E7085;
+	int (*func)(u32,u32,u8) = (int (*)(void))0x082E7085;
 	func(address,offset,size);
 }
 
-void somethingWithBG(u8 *BG)
+void loadPalette(int address, int offset, int size)
+{
+	int (*func)(u32,u8,u8) = (int (*)(void))0x080A1939;
+	func(address,offset,size);
+}
+
+void reloadBG(u8 *BG)
 {
 	int (*func)(u8) = (int (*)(void))0x0800236D;
 	func(BG);
@@ -263,13 +264,6 @@ u8 checkForLoadedBGs()
 {
 	int (*func)(void) = (int (*)(u8))0x08199A45;
 	return func();
-}
-
-void loadPalette(int *addr, int *offset, int *length)
-{
-	int (*func)(u32,u8,u8) = (int (*)(void))0x080A1939;
-	func(addr,offset,length);
-	
 }
 
 const u8 instsData[3] = {
@@ -282,10 +276,10 @@ void boxPrint(u8 foo, u8 font, u8 x, u8 y, u32 bar, u32 baz, u32 txtpointer)
 	func3(foo,font,x,y,bar,baz,txtpointer);
 }
 
-void writeBoxesToTilemap(u8 a, u8 b)
+void writeBoxToTilemap(u8 r0, u8 r1)
 {
-	int (*func5)(u8,u8) = (int (*)(void))0x08003659;
-	func5(a,b);
+	int (*func)(u8,u8) = (int (*)(void))0x08003659;
+	func(r0,r1);
 }
 
 void fillTileSpace(u8 *r0, u8 *colorNum)
@@ -304,7 +298,7 @@ void loadTutorialText(u32 *textAddr)
 	int (*func2)(u8) = (int (*)(void))0x0800378D;
 	func2(0x0);
 	
-	writeBoxesToTilemap(0x0,3);
+	writeBoxToTilemap(0x0,3);
 }
 
 u8 checkForSomethingIDunno()
@@ -325,12 +319,6 @@ void loadTilesIntoBGSpace(u8 r0, u32 GFXAddr, u8 r2, u8 r3, u8 sp)
 	func(r0,GFXAddr,r2,r3,sp);
 }
 
-void whatEvenIsThis(int r0, int offset)
-{
-	int (*func)(u8,u32) = (int (*)(void))0x08002251;
-	func(r0,offset);
-}
-
 void loadTilemapIntoBGSpace(u8 r0, u32 mapAddr, u8 r2, u8 r3)
 {
 	int (*func)(u8,u32,u8,u8) = (int (*)(void))0x080022F1;
@@ -343,24 +331,49 @@ void textboxBGInit(u32 *addr) //clears all textboxes, loads all boxes from list,
 	func(addr);
 }
 
-void loadBoxPalette(u8 r0, u8 r1, u8 slot)
+void prepTextSpace(u8 r0, u8 r1)
 {
-	int (*func)(u8,u8,u8) = (int (*)(void))0x0809877D;
-	func(r0,r1,slot);
+	int (*func)(u8,u8) = (int (*)(void))0x081973C5;
+	func(r0,r1);
 }
 
-void loadText(u32 memory, u32 rom)
+void loadNormalTextbox(u8 r0, u8 r1, u32 textPointer, u8 r3, u8 sp0, u8 sp4, u8 sp8)
 {
-	int (*func)(u32,u32) = (int (*)(void))0x0809877D;
-	func(memory,rom);
+	int (*func)(u8,u8,u32,u8,u8,u8,u8) = (int (*)(void))0x080045D1;
+	func(r0,r1,textPointer,r3,sp0,sp4,sp8);
 }
 
-void resetVars()
+void swiB(u32 origin, u32 dest, u32 options)
 {
-	TIMER[0] = 0;
-	TIMER[1] = 0;
-	for(int i = 0; i < 90; i++)
-	{
-		VAR[i] = 0;
-	}
+	int (*func)(u32,u32,u32) = (int (*)(void))0x082E7085;
+	func(origin,dest,options);
+}
+
+void loadStandardBoxBorders()
+{
+	int (*func)(u8,u16,u8) = (int (*)(void))0x0809877D;
+	func(0x0,(0x80 << 0x2),0xF0);
+	
+	int (*func2)(u8,u16,u8) = (int (*)(void))0x0809882D;
+	func2(0x0,(0x85 << 0x2),0xE0);
+}
+
+void loadMultipleSpriteFrames(int address)
+{
+	int (*func)(int) = (int (*)(void))0x08034531;
+	func(address);
+}
+
+u8 grabPalNumber(int offset)
+{
+	int (*func)(int) = (int (*)(void))0x080087D5;
+	return func(offset);
+}
+
+u32 createSprite(int *addr, int *XPos, int *YPos, int *priority)
+{
+	int (*func)(u32,u16,u16,u8) = (int (*)(u8))0x08006DF5;
+	u32 result = func(addr,XPos,YPos,priority);
+	
+	return (result*0x44) + objBaseAddr;
 }
