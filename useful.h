@@ -5,6 +5,19 @@
 #define dummyAnimTable	0x082EC69C
 #define dummyAnimData	0x082EC6A8
 #define dummyAnimRoutine 0x08007429
+#define mapHeader		0x02037318
+#define time			0x03005CFA
+#define dayOfWeek		*(u8 *) 0x0203D90C //CrystalDust only
+#define dayOfWeekTextTable	0x08343900 //CrystalDust only
+#define hourFormat		(*(u8  *) 0x0203D90E)
+#define globalVars		(*(u32 *) 0x0203CF40)
+
+#define KEYS            *(volatile u8*)0x030022EE
+#define KEYSHOLD        *(volatile u8*)0x030022EC
+#define KEYSSCROLL      *(volatile u8*)0x030022F0
+#define KEYSLR          *(volatile u8*)0x030022EF
+#define KEYSHOLDLR      *(volatile u8*)0x030022ED
+#define KEYSSCROLLLR    *(volatile u8*)0x030022F1
 
 void updateEverything()
 {
@@ -53,7 +66,7 @@ void storeToLoopTable(int *addr, int *slotNum)
 	func(addr,slotNum);
 }
 
-void clearOAM()
+void clearOAMs()
 {
 	int (*func)(void) = (int (*)(void))0x08006975;
 	func();
@@ -61,11 +74,19 @@ void clearOAM()
 
 void initStuff()
 {
-	clearOAM();
+	clearOAMs();
 	
-	int (*func2)(void) = (int (*)(void))0x0800870D;
-	func2();
+	int (*func)(void) = (int (*)(void))0x0800870D;
+	func();
+}
+
+void clearOAM(int address)
+{
+	int (*func)(int) = (int (*)(void))0x080075F5;
+	func(address);
 	
+	int (*func2)(int) = (int (*)(void))0x080070E9;
+	func2(address);
 }
 
 void initSomeStuff()
@@ -98,16 +119,16 @@ void clearLoopTable()
 	func();
 }
 
-void freeMaps()
+void clearKeyPresses()
 {
-	int (*func)(void) = (int (*)(void))0x080563F1;
-	int x = func();
+	int (*func)(void) = (int (*)(void))0x080005BD;
+	func();
 }
 
-void drawBox(void *foo, void *font, void *x, void *y, void *bar, void *baz, void *chars)
+void drawText(int *boxNumber, int *font, int *x, int *y, int *bar, int *baz, int *chars)
 {
-	int (*func)(void) = (int (*)(void))0x080F6CD1;
-	func();
+	int (*func)(int,int,int,int,int,int,int) = (int (*)(void))0x08199E65;
+	func(boxNumber,font,x,y,bar,baz,chars);
 }
 
 //void drawBox(void *foo, void *font, void *x, void *y, void *bar, void *baz, void *chars);
@@ -130,23 +151,7 @@ void somethingText2(void *r0, void *r1)
 	func();
 }
 
-void drawText(void *a, void *b, void *c, void *d)
-{
-	int (*func)(void) = (int (*)(void))0x081333C5;
-	func();
-}
-
-void unfadeScreen()
-{
-	fadeScreen2(0xFFFFFFFF,0x0,0x10,0,0x0000);
-}
-
-void fadeScreen()
-{
-	fadeScreen2(0xFFFFFFFF,0x0,0,0x10,0x0000);
-}
-
-void fadeScreen2(int *bitmask, int *r1, int *r2, int *r3, int *color)
+void fadeScreen(int *bitmask, int *r1, int *r2, int *r3, int *color)
 {
 
 	int (*func)(u32,u16,u16,u16,u16) = (int (*)(void))0x080A1AD5;
@@ -185,10 +190,10 @@ void playCry(int *pkmnNum, int *fx)
 	int x = func();
 }
 
-void playSound(int *fxNum)
+void playSound(int *soundNum)
 {
-	int (*func)(void) = (int (*)(void))0x080722CD;
-	int x = func();
+	int (*func)(u16) = (int (*)(void))0x080A37A5;
+	func(soundNum);
 }
 
 void changeIO(int *offset, int *value)
@@ -260,7 +265,7 @@ void reloadBG(u8 *BG)
 	func(BG);
 }
 
-u8 checkForLoadedBGs()
+u8 clearTempTileSpace()
 {
 	int (*func)(void) = (int (*)(u8))0x08199A45;
 	return func();
@@ -282,23 +287,10 @@ void writeBoxToTilemap(u8 r0, u8 r1)
 	func(r0,r1);
 }
 
-void fillTileSpace(u8 *r0, u8 *colorNum)
+void clearBoxSpace(int boxNumber, int colorNum)
 {
 	int (*func)(u8,u8) = (int (*)(void))0x08003C49;
-	func(r0,colorNum);
-}
-
-void loadTutorialText(u32 *textAddr)
-{
-	int (*func)(u8) = (int (*)(u32))0x08098C19;		//load tutorial bar palette
-	loadPalette(func(2),0xB0,0x20);
-	fillTileSpace(0x0,0xFF);	
-	boxPrint(0x0,0x0,0x2,0x1,instsData,0x00000000,textAddr);
-	
-	int (*func2)(u8) = (int (*)(void))0x0800378D;
-	func2(0x0);
-	
-	writeBoxToTilemap(0x0,3);
+	func(boxNumber,colorNum);
 }
 
 u8 checkForSomethingIDunno()
@@ -370,10 +362,95 @@ u8 grabPalNumber(int offset)
 	return func(offset);
 }
 
-u32 createSprite(int *addr, int *XPos, int *YPos, int *priority)
+u32 createSprite(int *addr, int *XPos, int *YPos, int *x)
 {
 	int (*func)(u32,u16,u16,u8) = (int (*)(u8))0x08006DF5;
-	u32 result = func(addr,XPos,YPos,priority);
+	u32 result = func(addr,XPos,YPos,x);
 	
 	return (result*0x44) + objBaseAddr;
+}
+
+u8 getCurrentRegion()
+{
+	int mapHeaderNumber = *((int *) mapHeader + 0x14);
+	int mapNumber = *((int *) mapHeaderNumber + 0x08F0AC30);
+	if(mapNumber > 4)
+		mapNumber = 0;
+	return mapNumber;
+}
+
+int getTextSizeInPixels(int font, int text, int r2)
+{
+	int (*func)(int,int,int) = (int (*)(u8))0x08005ED9;
+	return func(font,text,r2);
+}
+
+void enableBox(u8 box)
+{
+	int (*func)(u8) = (int (*)(void))0x0800378D;
+	func(box);
+}
+
+int grabSubRoutine(int entry, int offset) //loop table entry number, halfword offset
+{
+	int (*func)(int,int) = (int (*)(void))0x080A92B5;
+	return func(entry,offset);
+}
+
+void storeToSubRoutine(int entry, int offset, int addr) //loop table entry number, halfword offset, routine address
+{
+	int (*func)(int,int,int) = (int (*)(void))0x080A927D;
+	func(entry,offset,addr);
+}
+
+int grabLoopTableEntry(int addr)
+{
+	int (*func)(int) = (int (*)(void))0x080A921D;
+	return func(addr);
+}
+
+u8 checkFlag(int flag)
+{
+	int (*func)(int) = (int (*)(void))0x0809D791;
+	return func(flag);
+}
+
+u8 loadTextbox(int data)
+{
+	int (*func)(int) = (int (*)(void))0x08003381;
+	return func(data);
+}
+
+void clearTextbox(int box)
+{
+	int (*func)(int) = (int (*)(void))0x08003575;
+	func(box);
+}
+
+void clearAllTextboxes()
+{
+	int (*func)(void) = (int (*)(void))0x08003605;
+	func();
+}
+
+void fillMapSpace(int BG, int tile, int startX, int startY, int width, int height)
+{
+	int (*func)(int,int,int,int,int,int) = (int (*)(void))0x08002705;
+	func(BG,tile,startX,startY,width,height);
+}
+
+int divide(int numerator, int denominator)
+{
+	int i;
+	for(i=0;numerator >= denominator;i++)
+		numerator -= denominator;
+	return i;
+}
+
+int modulo(int numerator, int denominator)
+{
+	int i;
+	for(i=0;numerator >= denominator;i++)
+		numerator -= denominator;
+	return numerator;
 }
