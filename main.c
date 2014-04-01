@@ -2,6 +2,8 @@
 #define DMA3Dest		(*(u32 *) 0x040000D8)
 #define DMA3Options		(*(u32 *) 0x040000DC)
 
+#define BG2				(u32 *) 0x0600E800
+
 #define config			(*(u8  *) globalVars)
 #define currentCard		(*(u8  *)(globalVars + 1))
 #define previousCard	(*(u8  *)(globalVars + 2))
@@ -41,7 +43,9 @@ void init() {
 #include "img_bins/pkgearphone.h"
 #include "img_bins/pkgearbuttons.h"
 #include "img_bins/pkgearnumbers.h"
+#include "img_bins/mapcardtiles.h"
 #include "img_bins/johtomap.h"
+#include "img_bins/kantomap.h"
 
 //081C7250
 void init2() {
@@ -75,12 +79,17 @@ void init3(int loopTableNumber) {
 		mallocSubSpace(0x0,0x500);
 		mallocSubSpace(0x1,0x500);
 		mallocSubSpace(0x2,0x1000);
-		mallocSubSpace(0x3,0x2C);
+		mallocSubSpace(0x3,0x54);
+		mallocSubSpace(0x4,0x884);
 		
 		int blank = 0;
 		DMA3Source = &blank;
 		DMA3Dest = getAllocdSubSpace(2);
 		DMA3Options = 0x85000400;
+		
+		DMA3Source = &blank;
+		DMA3Dest = getAllocdSubSpace(4);
+		DMA3Options = 0x85000221;
 		
 		initMallocSpace(getAllocdSubSpace(3),0xB);
 		initStuff();
@@ -161,6 +170,7 @@ void main(int loopTableNumber) {
 	}
 	BCheck(loopTableNumber);
 	cardKeyPressChecks(currentCard);
+	
 	testNothingElse:
 	if(cardChanged == 1) {
 		playSound(0x5);
@@ -183,6 +193,7 @@ void quit(int loopTableNumber) {
 		free(getAllocdSubSpace(1));
 		free(getAllocdSubSpace(3));
 		free(getAllocdSubSpace(3));
+		free(getAllocdSubSpace(4));
 		free(&globalVars);
 		clearKeyPresses();
 		storeCallback(retToOW);
@@ -192,25 +203,171 @@ void quit(int loopTableNumber) {
 void cardKeyPressChecks(int currentCardVal)
 {
 	switch(currentCardVal) {
-	case 0:
+	case 0:		//clock card
 		if(keyPressed(KEY_SELECT)) {
 			hourFormat = 1 - hourFormat;
 			playSound(0x5);
+		}
+		break;
+	case 1:		//map card
+		switch(mapCardKeyChecks()) {
+		case 3:
+			loadPrimaryLayer();
+			loadSecondaryLayer();
+			loadShadowsSecondaryLayer();
+			loadCursorSFX();
+			writeBoxToTilemap(0,3);
+			break;
+		case 4:
+			break;
+		case 5:
 			break;
 		}
-	case 1:
-		//map card
 		break;
-	case 2:
-		//phone card
+	case 2:		//phone card
 		break;
-	case 3:
-		//radio card
+	case 3:		//radio card
 		break;
-	case 4:
-		//contest card?
+	case 4:		//contest card?
 		break;
 	}
+}
+
+const u8 mapNameWhitePalData[3] = { // background color, text color, text shadow color (color number)
+	0x00, 0x01, 0x02
+};
+
+const u16 blankShadowData[8] = {
+	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x8000, 0x0000, 0x0000
+};
+
+const u16 shadowData[8] = {
+	0x0018, 0x0008, 0x0090, 0x0018, 0x0018, 0x0018, 0x0090, 0x0028
+};
+
+void loadPrimaryLayer()
+{
+	clearBoxTilemapSpace(*(u8 *)(globalVars + 4));
+	clearBoxTileSpace(*(u8 *)(globalVars + 4),0);
+	int mapNameNumber = getPrimaryLayerMap();
+	if (mapNameNumber == 0xD5)
+		loadDataToWindows(0,blankShadowData);
+	else {
+		loadMapName(*(int *)(townMapVars + 0x8),mapNameNumber,0);
+		drawText(*(u8 *)(globalVars + 4),2,2,2,mapNameWhitePalData,0,*(int *)(townMapVars + 0x8));
+		enableBox(*(u8 *)(globalVars + 4));
+		writeBoxToTilemap(*(u8 *)(globalVars + 4),0);
+		loadDataToWindows(0,shadowData);
+	}
+}
+
+int getPrimaryLayerMap()
+{
+	int mapHeaderNumber = *(u16 *)townMapVars;
+	if (mapHeaderNumber == 0xAE || mapHeaderNumber == 0xBB) return 0xD5;
+	return mapHeaderNumber;
+}
+
+const u8 shadowIOSlotData[4] = {
+	0x44, 0x40, 0x46, 0x42
+};
+
+void loadDataToWindows(int windowNum, int windowDataPointer)
+{
+	windowNum = (windowNum << 0x18) >> 0x17;
+	changeIO(shadowIOSlotData[windowNum],((*(u16 *)(windowDataPointer + 0x2)) << 0x8) + *(u16 *)(windowDataPointer + 0x6));
+	changeIO(shadowIOSlotData[windowNum + 1],((*(u16 *)windowDataPointer) << 0x8) + (*(u8 *)(townMapVars + 0x7) << 0xB) + *(u16 *)(windowDataPointer + 0x4) + (*(u8 *)(townMapVars + 0x7) << 0x3));
+}
+
+const u8 mapNameGreenPalData[3] = { // background color, text color, text shadow color (color number)
+	0x00, 0x07, 0x02
+};
+
+const u8 mapNameRedPalData[3] = { // background color, text color, text shadow color (color number)
+	0x00, 0x0A, 0x02
+};
+
+const u32 mapNamePalDataPointerTable[2] = {
+	mapNameGreenPalData, mapNameRedPalData
+};
+
+void loadSecondaryLayer()
+{
+	triggerWindow(1,1);
+	clearBoxTilemapSpace(*(u8 *)(globalVars + 5));
+	u16 mapNameNumber = getSecondaryLayerMap();
+	if (mapNameNumber != 0xD5) {
+		triggerWindow(1,0);
+		clearBoxTileSpace(*(u8 *)(globalVars + 5),0);
+		loadMapName((*(int *)(townMapVars + 0x8)) + 0x13,getSecondaryLayerMap(),0);
+		int textColor = grabLayerMapNameStatus(1) << 0x18;
+		textColor = *(u32 *)((grabLayerMapNameStatus(1) - 2) + mapNamePalDataPointerTable);
+		drawText(*(u8 *)(globalVars + 5),2,0xC,2,textColor,0,(*(int *)(townMapVars + 0x8)) + 0x13);
+		enableBox(*(u8 *)(globalVars + 5));
+		writeBoxToTilemap(0,0);
+	}
+}
+
+const u16 windowTriggerData[2] = {
+	0x2000, 0x4000
+};
+
+void triggerWindow(u8 offset, u8 mode)
+{
+	if(mode == 0) {
+		int state = getCurrentIOState(0);
+		int windowTrigger = (state | windowTriggerData[offset]);
+		changeIO(0,windowTrigger);
+	}
+	else if(mode == 1) {
+		disableIOBit(0,windowTriggerData[offset]);
+	}
+}
+
+int getSecondaryLayerMap()
+{
+	int mapHeaderNumber = getMapNameFromPos(*(u16 *)(townMapVars + 0x54),*(u16 *)(townMapVars + 0x56),(*(u8 *)(townMapVars + 0x6) << 1) + 1);
+	if (mapHeaderNumber == 0x8D || (mapHeaderNumber == 0x42 && checkFlag(0x10F1) != 1)) return 0xD5;
+	return mapHeaderNumber;
+}
+
+void loadShadowsSecondaryLayer()
+{
+	loadDataToWindows(1,shadowData + 4);
+}
+
+int grabLayerMapNameStatus(int layerNumber)
+{
+	if(layerNumber == 1) return *(u8 *)(townMapVars + 0x3);
+	else return *(u8 *)(townMapVars + 0x2);
+}
+
+void loadCursorSFX()
+{
+	if (checkForSpecificCursorSFXCases() != 0 && ((getMapNameState(0) != 0 && getMapNameState(0) != 1) || (getMapNameState(1) != 0 && getMapNameState(1) != 1)))
+		playSound(0x6C);
+	
+	if (*(u16 *)(townMapVars + 0x54) == 0x15 && *(u16 *)(townMapVars + 0x56) == 0xD && *(u8 *)(townMapVars + 0x4) == 1)
+		playSound(0xE8);
+}
+
+int checkForSpecificCursorSFXCases()
+{
+	int primaryMapNameNumber = getMapNameFromPos(*(u16 *)(townMapVars + 0x54),*(u16 *)(townMapVars + 0x56),*(u8 *)(townMapVars + 0x6) << 1);
+	int secondaryMapNameNumber = getMapNameFromPos(*(u16 *)(townMapVars + 0x54),*(u16 *)(townMapVars + 0x56),(*(u8 *)(townMapVars + 0x6) << 1) + 1);
+	if (primaryMapNameNumber == 0x63 || secondaryMapNameNumber == 0x51)
+		return 0;
+	return 1;
+}
+
+int getMapNameState(int map) {
+	if (map == 1)
+		return (*(u8 *)(townMapVars + 0x3));
+	else return (*(u8 *)(townMapVars + 0x2));
+}
+
+void loadLocationSprites() {
+	asm volatile (".include \"loadLocationSprites.asm\"");
 }
 
 void animateCardSwap(int loopTableNumber) {
@@ -244,7 +401,7 @@ const u8 hourFormatBoxData[8] = {
 	0x00, 0x0A, 0x0B, 0xE, 0x03, 0x0F, 0x18, 0x00
 };
 
-const u8 hourFormatText[21] = { // SELECT: Switch time mode
+const u8 hourFormatText[20] = { // SELECT: Switch time mode
     0xCD, 0xBF, 0xC6, 0xBF, 0xBD, 0xCE, 0xF0, 0x00, 0xCD, 0xEB, 0xDD, 0xE8, 0xD7, 0xDC, 0x00, 0xE1, 
     0xE3, 0xD8, 0xD9, 0xFF, 
 };
@@ -264,9 +421,14 @@ const u8 callingText[26] = { // Whom do you want to call?
     0x00, 0xE8, 0xE3, 0x00, 0xD7, 0xD5, 0xE0, 0xE0, 0xAC, 0xFF
 };
 
+const u8 mapTextboxData[16] = {
+    0x00, 0x03, 0x01, 0x0F, 0x02, 0x0E, 0x01, 0x00,
+	0x00, 0x03, 0x03, 0x0F, 0x02, 0x0E, 0x1F, 0x00
+};
+
 void loadCard(currentCardVal) {
 	switch(currentCardVal) {
-	case 0:
+	case 0:		//clock card
 		loadTilemapIntoBGSpace(1,pkgearmenuMap,0,0);
 		loadPalette(pkgearmenuPal + 0xA,0xA,0x8);
 		prepTextSpace(0,0);
@@ -286,19 +448,44 @@ void loadCard(currentCardVal) {
 		reloadBG(0);
 		firstLoadClockImages();
 		storeToSubRoutine(*(u8 *)(globalVars + 3),0,(void *) checkTimeLoop + 1);
-		//clock card
 		break;
-	case 1:
+	case 1:		//map card
 		fillMapSpace(0,0,0,0xE,0x20,0x6);
 		reloadBG(0);
 		loadTilemapIntoBGSpace(1,pkgearmapMap,0,0);
 		reloadBG(1);
-		loadTilesIntoBGSpace(2,johtomapTiles,0,0,0);
-		loadTilemapIntoBGSpace(2,johtomapMap,0,2);
-		reloadBG(2);
-		//map card
+		*(u8 *)(getAllocdSubSpace(4) + 6) = getCurrentRegion();
+		*(u8 *)(getAllocdSubSpace(4) + 7) = 2;
+		*(u8 *)(getAllocdSubSpace(4) + 4) = 1;
+		initTownMapStuff(getAllocdSubSpace(4),0);
+		loadSelectionPointer();
+		loadPlayerHead();
+		changeIO(0x50,0xD4);
+		changeIO(0x54,0x6);
+		changeIO(0x48,0x3F3F);
+		changeIO(0x4A,0x1F);
+		loadDataToWindows(0,shadowData);
+		loadDataToWindows(1,shadowData + 0x4);
+		triggerWindow(0,0);
+		if (getSecondaryLayerMap() != 0xD5)
+			triggerWindow(1,0);
+		swi0B(mapTextboxData,globalVars + 0x24,0x4000004);
+		int XPos = *(u8 *)(globalVars + 0x25);
+		*(u8 *)(globalVars + 0x25) = (XPos + *(u8 *)(townMapVars + 0x7));
+		XPos = *(u8 *)(globalVars + 0x2D);
+		*(u8 *)(globalVars + 0x2D) = (XPos + *(u8 *)(townMapVars + 0x7));
+		int primaryLayerBox = loadTextbox(globalVars + 0x24);
+		enableBox(primaryLayerBox);
+		*(u8 *)(globalVars + 4) = primaryLayerBox;
+		int secondaryLayerBox = loadTextbox(globalVars + 0x2C);
+		enableBox(secondaryLayerBox);
+		*(u8 *)(globalVars + 5) = secondaryLayerBox;
+		loadPrimaryLayer();
+		loadSecondaryLayer();
+		writeBoxToTilemap(0,3);
+		loadLocationSprites();
 		break;
-	case 2:
+	case 2:		//phone card
 		loadTilemapIntoBGSpace(1,pkgearphoneMap,0,0);
 		reloadBG(1);
 		loadPalette(pkgearphonePal,0xA,0x8);
@@ -306,9 +493,8 @@ void loadCard(currentCardVal) {
 		loadNormalTextbox(0,1,callingText,0,1,0,0);
 		writeBoxToTilemap(0,3);
 		reloadBG(0);
-		//phone card
 		break;
-	case 3:
+	case 3:		//radio card
 		loadTilemapIntoBGSpace(1,pkgearmenuMap,0,0);
 		reloadBG(1);
 		loadPalette(pkgearradioPal,0xA,0x8);
@@ -317,10 +503,8 @@ void loadCard(currentCardVal) {
 		loadNormalTextbox(0,1,&FF,0,1,0,0);
 		writeBoxToTilemap(0,3);
 		reloadBG(0);
-		//radio card
 		break;
-	case 4:
-		//contest card?
+	case 4:		//contest card?
 		break;
 	}
 	previousCard = currentCardVal;
@@ -328,7 +512,7 @@ void loadCard(currentCardVal) {
 
 void unloadCard(int previousCardVal) {
 	switch(previousCardVal) {
-	case 0:
+	case 0:		//clock card
 		clearTextbox(*(u8 *)(globalVars + 4));
 		*(u8 *)(globalVars + 4) = 0;
 		clearTextbox(*(u8 *)(globalVars + 5));
@@ -337,25 +521,27 @@ void unloadCard(int previousCardVal) {
 			clearOAM(*(u32 *)(getAllocdSubSpace(3) + ((i + 5) << 2)));
 			*(u32 *)(getAllocdSubSpace(3) + ((i + 5) << 2)) = 0;
 		}
+		removeOAMTileSpace(1);
 		fillMapSpace(0,0,0,0,0x20,0xE);
-		//clock card
 		break;
-	case 1:
+	case 1:		//map card
+		removeOAMTileSpace(1);
+		removeOAMTileSpace(2);
+		
+		int blank = 0;
+		DMA3Source = &blank;
+		DMA3Dest = BG2;
+		DMA3Options = 0x85000200;
+		
 		fillMapSpace(0,0,0,0,0x20,0x14);
-		fillMapSpace(2,0,0,0,0x20,0x14);
-		reloadBG(2);
-		//map card
 		break;
-	case 2:
+	case 2:		//phone card
 		fillMapSpace(0,0,0,0,0x20,0xE);
-		//phone card
 		break;
-	case 3:
+	case 3:		//radio card
 		fillMapSpace(0,0,0,0,0x20,0xE);
-		//radio card
 		break;
-	case 4:
-		//contest card?
+	case 4:		//contest card?
 		break;
 	}
 }
@@ -364,11 +550,15 @@ const u32 mapDataUnk[4] = { // first byte half = bg number, 2nd, 3rd, and 4th = 
 	0x000001F8, 0x000011C1, 0x000021D6, 0x000031E3
 };
 
-const u8 textboxData[12] = { //BG number, X pos, Y pos, width, height, palette slot, tile number (2 bytes); list terminator = 0xFF, 0x00, 0x00, 0x00
+const u8 textboxData[12] = { // BG number, X pos, Y pos, width, height, palette slot, tile number (2 bytes); list terminator = 0xFF, 0x00, 0x00, 0x00
 	0x00, 0x06, 0x0F, 0x17, 0x04, 0x0F, 0x94, 0x01,
 	0xFF, 0x00, 0x00, 0x00
 };
 
+const u16 fontPalData[16] = {
+	0x7FFF, 0x7FFF, 0x318C, 0x675A, 0x043C, 0x3AFF, 0x0664, 0x4BD2,
+	0x6546, 0x7B14, 0x269F, 0x477C, 0x0000, 0x0000, 0x0000, 0x71C2
+};
 //1C7764
 void loadGFXLoop(int loopTableNumber) {
 
@@ -377,7 +567,6 @@ void loadGFXLoop(int loopTableNumber) {
 	if (*currentLoop == 0) {
 		changeIO(0,OBJ_ENABLE | OBJ_MAP_1D);
 		initSomeMoreStuff();
-		
 		initMapData(0x0,mapDataUnk,0x4);
 		clearStuff();
 		(*currentLoop)++;
@@ -392,6 +581,7 @@ void loadGFXLoop(int loopTableNumber) {
 		loadTilesIntoBGSpace(1,pkgearmenuTiles,0,2,0);
 		createNewBGSpace(1,(allocdSubSpace));
 		underloadPalette(pkgearmenuPal,0,0x60);
+		underloadPalette(fontPalData,0xE0,0x20);
 		(*currentLoop)++;
 	}
 	else if(*currentLoop == 3) {
@@ -404,7 +594,8 @@ void loadGFXLoop(int loopTableNumber) {
 	}
 	else if(*currentLoop == 4) {
 		int allocdSubSpace = getAllocdSubSpace(2);
-		createNewBGSpace(2,(allocdSubSpace));
+		loadTilesIntoBGSpace(2,mapcardTiles,0,0,0);
+//		createNewBGSpace(2,(allocdSubSpace));
 		(*currentLoop)++;
 	}
 	else if(*currentLoop == 5) {
@@ -502,7 +693,7 @@ void loadDayOfWeek()
 {
 	int dayOfWeekText = *(int *)((dayOfWeek << 2) + dayOfWeekTextTable);
 	int size = getTextSizeInPixels(1,dayOfWeekText,0xFFFFFFFF);
-	clearBoxSpace(*(u8 *)(globalVars + 4),0);
+	clearBoxTileSpace(*(u8 *)(globalVars + 4),0);
 	drawText(*(u8 *)(globalVars + 4),1,(0x40 - size) >> 1,5,boxPalData,0,dayOfWeekText);
 }
 
@@ -518,8 +709,8 @@ int mallocSubSpace(int sub, int size)
 	return *i;
 }
 
-const int spritePicData[4] = {
-	pkgearbuttonsTiles, 0x00000E00, pkgearnumbersTiles, 0x00010880
+const int buttonPicData[2] = {
+	pkgearbuttonsTiles, 0x00000E00
 };
 
 const int spritePalTable[4] = {
@@ -537,8 +728,7 @@ const u32 buttonData[6] = {
 
 void loadSprites()
 {
-	for(int i=0, address = &spritePicData;i<0x2;i++)
-		loadMultipleSpriteFrames(address + (i<<0x3));
+	loadMultipleSpriteFrames(&buttonPicData);
 	loadSpritePalettesFromTable(spritePalTable);
 	
 	for(int i=0;i<=0x4;i++) { //load side icons
@@ -569,6 +759,10 @@ void loadSprites()
 	}
 }
 
+const int numbersPicData[2] = {
+	pkgearnumbersTiles, 0x00010880
+};
+
 const u32 OAMData2[2] = {
 	0x40000000, 0x00000000
 };
@@ -583,6 +777,7 @@ const u8 clockX[6] = {
 };
 
 void firstLoadClockImages() {
+	loadMultipleSpriteFrames(&numbersPicData);
 	for(int i=0;i<=0x5;i++) { //load clock images
 		int spriteAddr = createSprite(numberData,clockX[i],0x40,0x0);
 		*(u32 *)(getAllocdSubSpace(3) + ((i + 5) << 2)) = spriteAddr;

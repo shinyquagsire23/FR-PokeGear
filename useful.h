@@ -7,10 +7,12 @@
 #define dummyAnimRoutine 0x08007429
 #define mapHeader		0x02037318
 #define time			0x03005CFA
-#define dayOfWeek		*(u8 *) 0x0203D90C //CrystalDust only
+#define dayOfWeek		*(u8  *) 0x0203D90C //CrystalDust only
 #define dayOfWeekTextTable	0x08343900 //CrystalDust only
-#define hourFormat		(*(u8  *) 0x0203D90E)
-#define globalVars		(*(u32 *) 0x0203CF40)
+#define regionTable		0x08F0AC30 //CrystalDust only
+#define hourFormat		*(u8  *) 0x0203D90E
+#define globalVars		*(u32 *) 0x0203CF40
+#define townMapVars		*(u32 *) 0x0203A144
 
 #define KEYS            *(volatile u8*)0x030022EE
 #define KEYSHOLD        *(volatile u8*)0x030022EC
@@ -131,26 +133,6 @@ void drawText(int *boxNumber, int *font, int *x, int *y, int *bar, int *baz, int
 	func(boxNumber,font,x,y,bar,baz,chars);
 }
 
-//void drawBox(void *foo, void *font, void *x, void *y, void *bar, void *baz, void *chars);
-
-void drawTextBox(void *r0, void *r1)
-{
-	int (*func)(void) = (int (*)(void))0x08003F21;//0x0810B995;
-	func();
-}
-
-void somethingText(void *r0, void *r1)
-{
-	int (*func)(void) = (int (*)(void))0x0800445D;
-	func();
-}
-
-void somethingText2(void *r0, void *r1)
-{
-	int (*func)(void) = (int (*)(void))0x080F6CD1;
-	func();
-}
-
 void fadeScreen(int *bitmask, int *r1, int *r2, int *r3, int *color)
 {
 
@@ -159,23 +141,10 @@ void fadeScreen(int *bitmask, int *r1, int *r2, int *r3, int *color)
 		
 }
 
-void fadeSong()
+void swi0B(int *source, int *dest, int *length)
 {
-	__asm("mov r0, #0x4");
-	int (*func)(void) = (int (*)(void))0x0806b155;
-	int x = func();
-}
-
-void copyPal(void *source, void *dest)
-{
-	__asm("mov r2, #0x8");
-	SystemCall(0xC);
-}
-
-void copyMem(void *source, void *dest, void *size)
-{
-	__asm("mov r2, #0x8");
-	SystemCall(0xC);
+	int (*func)(int,int,int) = (int (*)(void))0x082E7085;
+	func(source,dest,length);
 }
 
 void playSong(int *songNum)
@@ -199,6 +168,12 @@ void playSound(int *soundNum)
 void changeIO(int *offset, int *value)
 {
 	int (*func)(u32,u16) = (int (*)(void))0x080010B5;
+	func(offset,value);
+}
+
+void disableIOBit(int *offset, int *value)
+{
+	int (*func)(u32,u16) = (int (*)(void))0x08001209;
 	func(offset,value);
 }
 
@@ -287,10 +262,16 @@ void writeBoxToTilemap(u8 r0, u8 r1)
 	func(r0,r1);
 }
 
-void clearBoxSpace(int boxNumber, int colorNum)
+void clearBoxTileSpace(int boxNumber, int colorNum)
 {
 	int (*func)(u8,u8) = (int (*)(void))0x08003C49;
 	func(boxNumber,colorNum);
+}
+
+void clearBoxTilemapSpace(int boxNumber)
+{
+	int (*func)(u8) = (int (*)(void))0x080038A5;
+	func(boxNumber);
 }
 
 u8 checkForSomethingIDunno()
@@ -346,8 +327,8 @@ void loadStandardBoxBorders()
 	int (*func)(u8,u16,u8) = (int (*)(void))0x0809877D;
 	func(0x0,(0x80 << 0x2),0xF0);
 	
-	int (*func2)(u8,u16,u8) = (int (*)(void))0x0809882D;
-	func2(0x0,(0x85 << 0x2),0xE0);
+//	int (*func2)(u8,u16,u8) = (int (*)(void))0x0809882D;
+//	func2(0x0,(0x85 << 0x2),0xE0);
 }
 
 void loadMultipleSpriteFrames(int address)
@@ -372,8 +353,7 @@ u32 createSprite(int *addr, int *XPos, int *YPos, int *x)
 
 u8 getCurrentRegion()
 {
-	int mapHeaderNumber = *((int *) mapHeader + 0x14);
-	int mapNumber = *((int *) mapHeaderNumber + 0x08F0AC30);
+	int mapNumber = *(u8 *)(*((u8 *) mapHeader + 0x14) + 0x08F0AC30);
 	if(mapNumber > 4)
 		mapNumber = 0;
 	return mapNumber;
@@ -437,6 +417,54 @@ void fillMapSpace(int BG, int tile, int startX, int startY, int width, int heigh
 {
 	int (*func)(int,int,int,int,int,int) = (int (*)(void))0x08002705;
 	func(BG,tile,startX,startY,width,height);
+}
+
+void loadSelectionPointer()
+{
+	int (*func)(int,int) = (int (*)(void))0x08124289;
+	func(1,1);
+}
+
+void loadPlayerHead()
+{
+	int (*func)(int,int) = (int (*)(void))0x081240D5;
+	func(2,2);
+}
+
+void removeOAMTileSpace(int tileSpaceNumber)
+{
+	int (*func)(int) = (int (*)(void))0x08008569;
+	func(tileSpaceNumber);
+}
+
+void initTownMapStuff(int memaddr, int r1)
+{
+	int (*func)(int,int) = (int (*)(void))0x08122CDD;
+	func(memaddr,r1);
+}
+
+int mapCardKeyChecks()
+{
+	int (*func)(void) = (int (*)(void))0x081230AD;
+	return func();
+}
+
+void loadMapName(int offset, int number, int length)
+{
+	int (*func)(int,int,int) = (int (*)(void))0x0812456D;
+	func(offset,number,length);
+}
+
+int getCurrentIOState(int mode)
+{
+	int (*func)(int) = (int (*)(int))0x080011B9;
+	return func(mode);
+}
+
+int getMapNameFromPos(int x, int y, int map)
+{
+	int (*func)(int,int,int) = (int (*)(int))0x0812386D;
+	return func(x,y,map);
 }
 
 int divide(int numerator, int denominator)
