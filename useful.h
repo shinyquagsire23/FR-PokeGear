@@ -10,9 +10,12 @@
 #define dayOfWeek		*(u8  *) 0x0203D90C //CrystalDust only
 #define dayOfWeekTextTable	0x08343900 //CrystalDust only
 #define regionTable		0x08F0AC30 //CrystalDust only
-#define hourFormat		*(u8  *) 0x0203D90E
+#define hourFormat		*(u8  *) 0x0203D90E //CrystalDust only
+#define radioStation	*(u8  *) 0x0203D910 //CrystalDust only
 #define globalVars		*(u32 *) 0x0203CF40
 #define townMapVars		*(u32 *) 0x0203A144
+#define currentlyPlaying	*(u8 *) 0x03007427
+#define radioSelectSound	0x74
 
 #define KEYS            *(volatile u8*)0x030022EE
 #define KEYSHOLD        *(volatile u8*)0x030022EC
@@ -68,6 +71,12 @@ void storeToLoopTable(int *addr, int *slotNum)
 	func(addr,slotNum);
 }
 
+void callRoutine(int *addr, int *loopTableNum)
+{
+	int (*func)(int) = (int (*)(void))addr;
+	func(loopTableNum);
+}
+
 void clearOAMs()
 {
 	int (*func)(void) = (int (*)(void))0x08006975;
@@ -101,6 +110,12 @@ void initSomeStuff()
 	
 	int (*func3)(void) = (int (*)(void))0x08085D35;
 	func3();
+}
+
+void clearCaveWindow()
+{
+	int (*func)(void) = (int (*)(void))0x080B9FB9;
+	func();
 }
 
 u32 malloc(int *size)
@@ -141,22 +156,34 @@ void fadeScreen(int *bitmask, int *r1, int *r2, int *r3, int *color)
 		
 }
 
-void swi0B(int *source, int *dest, int *length)
+void swi0B(int *source, int *dest, int *options)
 {
 	int (*func)(int,int,int) = (int (*)(void))0x082E7085;
-	func(source,dest,length);
+	func(source,dest,options);
+}
+
+void swi11(int *source, int *dest)
+{
+	int (*func)(int,int) = (int (*)(void))0x082E7091;
+	func(source,dest);
 }
 
 void playSong(int *songNum)
 {
-	int (*func)(void) = (int (*)(void))0x081DD0F5;
-	int x = func();
+	int (*func)(int) = (int (*)(void))0x080A2F11;
+	func(songNum);
+}
+
+int grabDefaultSong()
+{
+	int (*func)(void) = (int (*)(void))0x08085739;
+	return func();
 }
 
 void playCry(int *pkmnNum, int *fx)
 {
 	int (*func)(void) = (int (*)(void))0x08071dF1;
-	int x = func();
+	func();
 }
 
 void playSound(int *soundNum)
@@ -177,11 +204,14 @@ void disableIOBit(int *offset, int *value)
 	func(offset,value);
 }
 
-void initSomeMoreStuff()
+void initSomething()
 {
 	int (*func)(void) = (int (*)(void))0x08003605;
 	func();
-	
+}
+
+void initSomethingElse()
+{
 	int (*func2)(u8) = (int (*)(void))0x080017BD;
 	func2(0x0);
 }
@@ -316,12 +346,6 @@ void loadNormalTextbox(u8 r0, u8 r1, u32 textPointer, u8 r3, u8 sp0, u8 sp4, u8 
 	func(r0,r1,textPointer,r3,sp0,sp4,sp8);
 }
 
-void swiB(u32 origin, u32 dest, u32 options)
-{
-	int (*func)(u32,u32,u32) = (int (*)(void))0x082E7085;
-	func(origin,dest,options);
-}
-
 void loadStandardBoxBorders()
 {
 	int (*func)(u8,u16,u8) = (int (*)(void))0x0809877D;
@@ -331,10 +355,10 @@ void loadStandardBoxBorders()
 //	func2(0x0,(0x85 << 0x2),0xE0);
 }
 
-void loadMultipleSpriteFrames(int address)
+u16 loadMultipleSpriteFrames(int address)
 {
 	int (*func)(int) = (int (*)(void))0x08034531;
-	func(address);
+	return func(address);
 }
 
 u8 grabPalNumber(int offset)
@@ -343,10 +367,10 @@ u8 grabPalNumber(int offset)
 	return func(offset);
 }
 
-u32 createSprite(int *addr, int *XPos, int *YPos, int *x)
+u32 createSprite(int *addr, int *XPos, int *YPos, int *unk)
 {
 	int (*func)(u32,u16,u16,u8) = (int (*)(u8))0x08006DF5;
-	u32 result = func(addr,XPos,YPos,x);
+	u32 result = func(addr,XPos,YPos,unk);
 	
 	return (result*0x44) + objBaseAddr;
 }
@@ -419,16 +443,16 @@ void fillMapSpace(int BG, int tile, int startX, int startY, int width, int heigh
 	func(BG,tile,startX,startY,width,height);
 }
 
-void loadSelectionPointer()
+void loadSelectionPointer(int frame, int pal)
 {
-	int (*func)(int,int) = (int (*)(void))0x08124289;
-	func(1,1);
+	int (*func)(int,int) = (int (*)(int,int))0x08124289;
+	func(frame,pal);
 }
 
-void loadPlayerHead()
+void loadPlayerHead(int frame, int pal)
 {
-	int (*func)(int,int) = (int (*)(void))0x081240D5;
-	func(2,2);
+	int (*func)(int,int) = (int (*)(int,int))0x081240D5;
+	func(frame,pal);
 }
 
 void removeOAMTileSpace(int tileSpaceNumber)
@@ -465,6 +489,18 @@ int getMapNameFromPos(int x, int y, int map)
 {
 	int (*func)(int,int,int) = (int (*)(int))0x0812386D;
 	return func(x,y,map);
+}
+
+void clearPointerAndHead()
+{
+	int (*func)(void) = (int (*)(void))0x0812305D;
+	func();
+}
+
+void clearPalette(int pal)
+{
+	int (*func)(int) = (int (*)(void))0x0800884D;
+	func(pal);
 }
 
 int divide(int numerator, int denominator)

@@ -54,9 +54,26 @@ bpee :
 
 #Auto-Insert into the ROM
 ifdef fname
+	cp "$(fname)" "$(fname)_bak"
 ifdef INSERT
 	dd if=main.bin of="$(fname)" conv=notrunc seek=$(INSERT) bs=1
+else
+	@echo "Insertion location not found!"
+	@echo "Did you forget to define 'offset'?"
+	@echo "Ex: make <version> fname=something.gba offset=<offset in hex>"
 endif
+else
+	@echo "File location not found!"
+	@echo "Did you forget to define 'fname'?"
+	@echo "Ex: make <version> fname=<GBA ROM File> insert=1A2B3C"
 endif
 
 .PHONY : bpee
+
+clean :
+	rm main.bin
+ifdef fname
+	cp "$(fname)_bak" "$(fname)"
+endif
+
+.PHONY : clean

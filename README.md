@@ -1,4 +1,8 @@
 FR-PokeGear
 ===============
 
-So this is my experimental PokeGear thingy. I never really got too far into it due to not being able to properly render text, so this was abandoned. Now diegoisawesome wants to resurrect this thingy and make it awesome so he can go right on ahead and do what he wants with this code. Oh, and you should probably rename a few things since I was too lazy to rename intro.c to main.c and I didn't want to give out a bunch of broken code, so there you go.
+This is an archive of some terrible old code from back when Diegoisawesome was a C noob. As it currently stands, this WILL NOT COMPILE. Some major refactoring needs to be done in order to have this compile and insert into any ROM besides a specially-crafted copy of CrystalDust. However, some people have requested that the latest version of this code be uploaded to GitHub in order to create custom menus themselves so hopefully this is satisfactory.
+
+Not included are the map image files as those are for use in CrystalDust only.
+
+REPEAT: THIS WILL NOT WORK AS IS. THIS IS ONLY FOR ARCHIVAL PURPOSES.
